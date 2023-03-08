@@ -38,6 +38,7 @@ class LLaMA:
         input_text_mask = tokens != self.tokenizer.pad_id
         start_pos = min_prompt_size
         prev_pos = 0
+
         for cur_pos in range(start_pos, total_len):
             logits = self.model.forward(tokens[:, prev_pos:cur_pos], prev_pos)
             if temperature > 0:
@@ -54,16 +55,32 @@ class LLaMA:
             prev_pos = cur_pos
 
         decoded = []
+
+        total_prompt_token_length = sum(len(ele) for ele in prompt_tokens)
+        total_prompt_padded_token_length = bsz * total_len
+        total_token_length = 0
+        total_padded_token_length = 0
         for i, t in enumerate(tokens.tolist()):
             # cut to max gen len
+            total_padded_token_length += len(t)
             t = t[: len(prompt_tokens[i]) + max_gen_len]
             # cut to eos tok if any
             try:
                 t = t[: t.index(self.tokenizer.eos_id)]
             except ValueError:
                 pass
+            total_token_length += len(t)
             decoded.append(self.tokenizer.decode(t))
-        return decoded
+        other_info = {
+            "num_of_prompts": len(prompts),
+            "min_prompt_length": min_prompt_size,
+            "max_prompt_length": max_prompt_size,
+            "total_prompt_token_length": total_prompt_token_length,
+            "total_prompt_padded_token_length": total_prompt_padded_token_length,
+            "total_token_length": total_token_length,
+            "total_padded_token_length": total_padded_token_length,
+        }
+        return decoded, other_info
 
 
 def sample_top_p(probs, p):
